@@ -81,6 +81,9 @@ function OrcamentoFormPage({ navigate, params }) {
         await OrcamentosAPI.create(payload);
         window.toast.success('Orçamento cadastrado com sucesso.');
       }
+      DataStore.invalidate('listOrcamentos');
+      DataStore.invalidate('dashboard');
+      DataStore.invalidate('getObra');
       navigate('obraDetail', { idObra: form.ID_OBRA });
     } catch (err) {
       window.toast.error('Erro ao salvar orçamento: ' + err.message);
