@@ -6,38 +6,32 @@
  * ============================================================
  */
 function ObrasListPage({ navigate, params }) {
-  const [items, setItems] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
-  const [totalPages, setTotalPages] = React.useState(1);
-  const [total, setTotal] = React.useState(0);
   const [query, setQuery] = React.useState('');
   const [situacao, setSituacao] = React.useState('');
   const [municipio, setMunicipio] = React.useState('');
-  const [municipios, setMunicipios] = React.useState([]);
   const [sortField, setSortField] = React.useState('DataCadastro');
   const [sortDir, setSortDir] = React.useState('desc');
   const [confirmDelete, setConfirmDelete] = React.useState(null);
 
   const situacoes = ['Planejada', 'Em andamento', 'Paralisada', 'Concluída', 'Cancelada'];
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await ObrasAPI.list({ q: query, situacao, municipio, page, pageSize: window.APP_CONFIG.ITEMS_PER_PAGE, sortField, sortDir });
-      setItems(res.data);
-      setTotal(res.total);
-      setTotalPages(res.totalPages);
-    } catch (err) {
-      window.toast.error('Erro ao listar obras: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Filtros viram parte da chave do cache: cada combinação de filtro/página tem
+  // seu próprio "instantâneo", mostrado na hora ao repetir a mesma combinação
+  // e atualizado silenciosamente a cada 20s.
+  const listParams = { q: query, situacao, municipio, page, pageSize: window.APP_CONFIG.ITEMS_PER_PAGE, sortField, sortDir };
+  const listKey = 'listObras|' + JSON.stringify(listParams);
+  const { data: listRes, loading, error } = useCachedQuery(listKey, () => ObrasAPI.list(listParams), { pollInterval: 20000 });
 
-  React.useEffect(() => { load(); }, [page, situacao, municipio, sortField, sortDir]);
-  React.useEffect(() => { ObrasAPI.municipios().then((r) => setMunicipios(r.data)).catch(() => {}); }, []);
-  React.useEffect(() => { setPage(1); load(); }, [query]);
+  const { data: municipiosRes } = useCachedQuery('listMunicipios', () => ObrasAPI.municipios(), { pollInterval: 60000 });
+
+  const items = listRes ? listRes.data : [];
+  const total = listRes ? listRes.total : 0;
+  const totalPages = listRes ? listRes.totalPages : 1;
+  const municipios = municipiosRes ? municipiosRes.data : [];
+
+  React.useEffect(() => { if (error) window.toast.error('Erro ao listar obras: ' + error.message); }, [error]);
+  React.useEffect(() => { setPage(1); }, [query, situacao, municipio]);
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
@@ -49,7 +43,11 @@ function ObrasListPage({ navigate, params }) {
       await ObrasAPI.remove(confirmDelete.ID_OBRA);
       window.toast.success('Obra excluída com sucesso.');
       setConfirmDelete(null);
-      load();
+      // Invalida os caches afetados para refletir a exclusão imediatamente
+      DataStore.invalidate('listObras');
+      DataStore.invalidate('dashboard');
+      DataStore.invalidate('listMunicipios');
+      DataStore.invalidate('listTiposObra');
     } catch (err) {
       window.toast.error('Erro ao excluir: ' + err.message);
     }
