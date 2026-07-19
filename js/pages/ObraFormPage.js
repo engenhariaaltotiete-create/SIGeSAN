@@ -70,6 +70,11 @@ function ObraFormPage({ navigate, params }) {
         await ObrasAPI.create(form);
         window.toast.success('Obra cadastrada com sucesso.');
       }
+      DataStore.invalidate('listObras');
+      DataStore.invalidate('dashboard');
+      DataStore.invalidate('getObra');
+      DataStore.invalidate('listMunicipios');
+      DataStore.invalidate('listTiposObra');
       navigate('obras');
     } catch (err) {
       window.toast.error('Erro ao salvar obra: ' + err.message);
