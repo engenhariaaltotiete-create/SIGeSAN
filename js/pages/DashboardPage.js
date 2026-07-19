@@ -5,25 +5,24 @@
  * ============================================================
  */
 function DashboardPage({ navigate }) {
-  const [data, setData] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
   const chartMunicipioRef = React.useRef(null);
   const chartTipoRef = React.useRef(null);
   const chartInstances = React.useRef({});
+  const notifiedErrorRef = React.useRef(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await DashboardAPI.get();
-      setData(res.data);
-    } catch (err) {
-      window.toast.error('Erro ao carregar dashboard: ' + err.message);
-    } finally {
-      setLoading(false);
+  // Cache com atualização em segundo plano a cada 20s.
+  // Ao voltar para o Dashboard, os últimos dados carregados aparecem
+  // na hora; uma atualização silenciosa acontece por trás.
+  const { data: res, loading, error } = useCachedQuery('dashboard', () => DashboardAPI.get(), { pollInterval: 20000 });
+  const data = res ? res.data : null;
+
+  React.useEffect(() => {
+    if (error && !notifiedErrorRef.current) {
+      window.toast.error('Erro ao carregar dashboard: ' + error.message);
+      notifiedErrorRef.current = true;
     }
-  };
-
-  React.useEffect(() => { load(); }, []);
+    if (!error) notifiedErrorRef.current = false;
+  }, [error]);
 
   React.useEffect(() => {
     if (!data) return;
