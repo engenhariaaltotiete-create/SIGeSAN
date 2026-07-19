@@ -88,6 +88,9 @@ function VistoriaFormPage({ navigate, params }) {
         await VistoriasAPI.create(payload);
         window.toast.success('Vistoria cadastrada com sucesso.');
       }
+      DataStore.invalidate('listVistorias');
+      DataStore.invalidate('dashboard');
+      DataStore.invalidate('getObra');
       navigate('obraDetail', { idObra: form.ID_OBRA });
     } catch (err) {
       window.toast.error('Erro ao salvar vistoria: ' + err.message);
