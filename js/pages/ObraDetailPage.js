@@ -6,30 +6,23 @@
  * ============================================================
  */
 function ObraDetailPage({ navigate, params }) {
-  const [obra, setObra] = React.useState(null);
-  const [vistorias, setVistorias] = React.useState([]);
-  const [orcamentos, setOrcamentos] = React.useState([]);
   const [tab, setTab] = React.useState('resumo');
-  const [loading, setLoading] = React.useState(true);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await ObrasAPI.get(params.idObra);
-      setObra(res.data.obra);
-      setVistorias(res.data.vistorias);
-      setOrcamentos(res.data.orcamentos);
-    } catch (err) {
-      window.toast.error('Erro ao carregar obra: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const detailKey = 'getObra|' + params.idObra;
+  const { data: res, loading, error } = useCachedQuery(detailKey, () => ObrasAPI.get(params.idObra), { pollInterval: 20000 });
 
-  React.useEffect(() => { load(); }, [params?.idObra]);
+  React.useEffect(() => { if (error) window.toast.error('Erro ao carregar obra: ' + error.message); }, [error]);
+
+  // Chamado pelas sub-abas após criar/editar/excluir vistoria ou orçamento,
+  // para que o resumo e as listas desta tela reflitam a mudança na hora.
+  const refresh = () => { DataStore.invalidate('getObra|' + params.idObra); DataStore.invalidate('dashboard'); };
 
   if (loading) return <Loading text="Carregando obra..." inline />;
-  if (!obra) return <EmptyState title="Obra não encontrada" />;
+  if (!res) return <EmptyState title="Obra não encontrada" />;
+
+  const obra = res.data.obra;
+  const vistorias = res.data.vistorias;
+  const orcamentos = res.data.orcamentos;
 
   return (
     <div className="fade-in">
@@ -90,11 +83,11 @@ function ObraDetailPage({ navigate, params }) {
       )}
 
       {tab === 'vistorias' && (
-        <ObraVistoriasTab idObra={obra.ID_OBRA} vistorias={vistorias} onChanged={load} navigate={navigate} />
+        <ObraVistoriasTab idObra={obra.ID_OBRA} vistorias={vistorias} onChanged={refresh} navigate={navigate} />
       )}
 
       {tab === 'orcamentos' && (
-        <ObraOrcamentosTab idObra={obra.ID_OBRA} orcamentos={orcamentos} onChanged={load} navigate={navigate} />
+        <ObraOrcamentosTab idObra={obra.ID_OBRA} orcamentos={orcamentos} onChanged={refresh} navigate={navigate} />
       )}
     </div>
   );
@@ -109,6 +102,7 @@ function ObraVistoriasTab({ idObra, vistorias, onChanged, navigate }) {
       await VistoriasAPI.remove(confirmDelete.ID_VISTORIA);
       window.toast.success('Vistoria excluída.');
       setConfirmDelete(null);
+      DataStore.invalidate('listVistorias');
       onChanged();
     } catch (err) { window.toast.error('Erro ao excluir: ' + err.message); }
   };
@@ -159,6 +153,7 @@ function ObraOrcamentosTab({ idObra, orcamentos, onChanged, navigate }) {
       await OrcamentosAPI.remove(confirmDelete.ID_ORCAMENTO);
       window.toast.success('Orçamento excluído.');
       setConfirmDelete(null);
+      DataStore.invalidate('listOrcamentos');
       onChanged();
     } catch (err) { window.toast.error('Erro ao excluir: ' + err.message); }
   };
