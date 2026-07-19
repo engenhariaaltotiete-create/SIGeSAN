@@ -5,35 +5,30 @@
  * ============================================================
  */
 function OrcamentosListPage({ navigate }) {
-  const [items, setItems] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
-  const [totalPages, setTotalPages] = React.useState(1);
-  const [total, setTotal] = React.useState(0);
   const [query, setQuery] = React.useState('');
   const [status, setStatus] = React.useState('');
   const [confirmDelete, setConfirmDelete] = React.useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await OrcamentosAPI.list({ q: query, status, page, pageSize: window.APP_CONFIG.ITEMS_PER_PAGE });
-      setItems(res.data);
-      setTotal(res.total);
-      setTotalPages(res.totalPages);
-    } catch (err) { window.toast.error('Erro ao listar orçamentos: ' + err.message); }
-    finally { setLoading(false); }
-  };
+  const listParams = { q: query, status, page, pageSize: window.APP_CONFIG.ITEMS_PER_PAGE };
+  const listKey = 'listOrcamentos|' + JSON.stringify(listParams);
+  const { data: listRes, loading, error } = useCachedQuery(listKey, () => OrcamentosAPI.list(listParams), { pollInterval: 20000 });
 
-  React.useEffect(() => { load(); }, [page, status]);
-  React.useEffect(() => { setPage(1); load(); }, [query]);
+  const items = listRes ? listRes.data : [];
+  const total = listRes ? listRes.total : 0;
+  const totalPages = listRes ? listRes.totalPages : 1;
+
+  React.useEffect(() => { if (error) window.toast.error('Erro ao listar orçamentos: ' + error.message); }, [error]);
+  React.useEffect(() => { setPage(1); }, [query, status]);
 
   const handleDelete = async () => {
     try {
       await OrcamentosAPI.remove(confirmDelete.ID_ORCAMENTO);
       window.toast.success('Orçamento excluído com sucesso.');
       setConfirmDelete(null);
-      load();
+      DataStore.invalidate('listOrcamentos');
+      DataStore.invalidate('dashboard');
+      DataStore.invalidate('getObra');
     } catch (err) { window.toast.error('Erro ao excluir: ' + err.message); }
   };
 
